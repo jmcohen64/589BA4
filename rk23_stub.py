@@ -48,7 +48,7 @@ class ODESolution:
 
 
 
-def rk23(f, t_range, y0, h=1, tolerance=1e-4, events=None):
+def rk23(f, t_range, y0, h=1, tolerance=1e-6, events=None):
     t0, t_end = t_range
     t = t0
     y = y0
@@ -69,13 +69,16 @@ def rk23(f, t_range, y0, h=1, tolerance=1e-4, events=None):
         
         # Stage 3
         k3 = h * f(t + 0.75 * h, y + 0.75 * k2)
-        
+
         # Second-order estimate
-        y2 = y + (7/24) * k1 + (1/4) * k2 + (1/3) * k3
+        y2 = y + (2/9) * k1 + (1/3) * k2 + (4/9) * k3
+        
+        # Stage 4 (needed for third-order estimate)
+        k4 = h * f(t + h, y2)
         
         # Third-order estimate
-        y3 = y + (2/9) * k1 + (1/3) * k2 + (4/9) * k3
-        
+        y3 = y + (7/24) * k1 + (1/4) * k2 + (1/3) * k3 + (1/8) * k4
+
         # Error estimate (normalized)
         scaling = np.maximum(1e-10, np.linalg.norm(y))
         error = np.linalg.norm(y3 - y2) / scaling
@@ -106,7 +109,7 @@ def rk23(f, t_range, y0, h=1, tolerance=1e-4, events=None):
 
             iter += 1
         else:
-            print("Reducing step size...", error)
+            #print("Reducing step size...", error)
             # Reject step and reduce step size conservatively
             step_adjustment = (tolerance / error) ** (1/2)
             h = 0.9 * h + 0.1 * (h * max(0.8, step_adjustment))
@@ -159,6 +162,12 @@ def rk23_refine_event(f, events, evt, tolerance=1e-6):
     #print("found zero")
     return t1, y1
 
+def period(list):
+    #given a list of events, calclualtes the time between each event and then returns the average
+    sum = 0
+    for i in range(len(list)-1):
+        sum += (list[i+1]-list[i])
+    return sum/(len(list)-1)
 
 if __name__ == "__main__":
 
@@ -172,7 +181,7 @@ if __name__ == "__main__":
         return y[0]
 
     t0, y0 = 0, np.array([2,0])
-    t_end = 5
+    t_end = 10
     tol = 1e-12
 
     sol = rk23(f, [0, t_end], y0, tolerance=tol,
@@ -191,6 +200,7 @@ if __name__ == "__main__":
         events=event_fun
     )
 
-    print("mine:", y, "solv_ivp:", sol2.y[-1])
+    print("mine:", y, "solv_ivp:", sol2.y[:,-1])
     print("mine:", t_events, "solv_ivp:", sol2.t_events)
     print("mine:", y_events, "solv_ivp:", sol2.y_events)
+    print("period:", period(t_events))
